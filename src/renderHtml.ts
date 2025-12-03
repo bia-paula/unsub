@@ -14,6 +14,8 @@ export function renderHtml() {
           input { flex-grow: 1; }
           ul { list-style-type: none; padding: 0; }
           li { display: flex; justify-content: space-between; padding: 0.5rem; border-bottom: 1px solid #eee; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 2rem; }
+          th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #eee; }
         </style>
       </head>
       <body>
@@ -25,6 +27,20 @@ export function renderHtml() {
             <input type="text" id="domain" name="domain" placeholder="example.com" required>
             <button type="submit">Log Unsubscribe</button>
           </form>
+
+          <h2>Stats</h2>
+          <table id="stats-table">
+            <thead>
+              <tr>
+                <th>Domain</th>
+                <th>Count</th>
+                <th>Latest Unsubscription</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+
+          <h2>History</h2>
           <ul id="unsub-list"></ul>
         </main>
         <script>
@@ -32,6 +48,26 @@ export function renderHtml() {
             const form = document.getElementById('unsub-form');
             const domainInput = document.getElementById('domain');
             const list = document.getElementById('unsub-list');
+            const statsTableBody = document.querySelector('#stats-table tbody');
+
+            const fetchStats = async () => {
+              const response = await fetch('/api/unsubscriptions/stats');
+              const stats = await response.json();
+              statsTableBody.innerHTML = '';
+              stats.forEach(stat => {
+                const tr = document.createElement('tr');
+                const domainTd = document.createElement('td');
+                domainTd.textContent = stat.domain;
+                const countTd = document.createElement('td');
+                countTd.textContent = stat.count;
+                const dateTd = document.createElement('td');
+                dateTd.textContent = new Date(stat.latest_unsubscription).toLocaleString();
+                tr.appendChild(domainTd);
+                tr.appendChild(countTd);
+                tr.appendChild(dateTd);
+                statsTableBody.appendChild(tr);
+              });
+            };
 
             const fetchUnsubs = async () => {
               const response = await fetch('/api/unsubscriptions');
@@ -59,9 +95,11 @@ export function renderHtml() {
               });
               domainInput.value = '';
               fetchUnsubs();
+              fetchStats();
             });
 
             fetchUnsubs();
+            fetchStats();
           });
         </script>
       </body>

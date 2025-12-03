@@ -21,6 +21,11 @@ export default {
 					.run();
 				return new Response("Unsubscription added", { status: 201 });
 			}
+		} else if (pathname === "/api/unsubscriptions/stats") {
+			const { results } = await env.DB.prepare(
+				"SELECT domain, COUNT(*) as count, MAX(created_at) as latest_unsubscription FROM unsubscriptions GROUP BY domain ORDER BY count DESC"
+			).all();
+			return Response.json(results);
 		} else if (pathname === "/") {
 			return new Response(renderHtml(), {
 				headers: {
