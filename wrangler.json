@@ -1,0 +1,16 @@
+{
+	"compatibility_date": "2025-10-08",
+	"main": "src/index.ts",
+	"name": "unsub",
+	"upload_source_maps": true,
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_id": "b08224ec-fa2c-4039-8b6e-427e9abc0631",
+			"database_name": "unsub-database"
+		}
+	],
+	"observability": {
+		"enabled": true
+	}
+}
