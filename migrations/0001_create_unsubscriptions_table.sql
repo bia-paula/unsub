@@ -1,0 +1,6 @@
+-- Migration number: 0001
+CREATE TABLE unsubscriptions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  domain TEXT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);

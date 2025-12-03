@@ -1,29 +1,70 @@
-export function renderHtml(content: string) {
-	return `
+export function renderHtml() {
+    return `
     <!DOCTYPE html>
     <html lang="en">
       <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>D1</title>
+        <title>Unsubscribe Tracker</title>
         <link rel="stylesheet" type="text/css" href="https://static.integrations.cloudflare.com/styles.css">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+          main { padding-top: 2rem; }
+          form { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+          input { flex-grow: 1; }
+          ul { list-style-type: none; padding: 0; }
+          li { display: flex; justify-content: space-between; padding: 0.5rem; border-bottom: 1px solid #eee; }
+        </style>
       </head>
-    
       <body>
         <header>
-          <img
-            src="https://imagedelivery.net/wSMYJvS3Xw-n339CbDyDIA/30e0d3f6-6076-40f8-7abb-8a7676f83c00/public"
-          />
-          <h1>🎉 Successfully connected d1-template to D1</h1>
+          <h1>Unsubscribe Tracker</h1>
         </header>
         <main>
-          <p>Your D1 Database contains the following data:</p>
-          <pre><code><span style="color: #0E838F">&gt; </span>SELECT * FROM comments LIMIT 3;<br>${content}</code></pre>
-          <small class="blue">
-            <a target="_blank" href="https://developers.cloudflare.com/d1/tutorials/build-a-comments-api/">Build a comments API with Workers and D1</a>
-          </small>
+          <form id="unsub-form">
+            <input type="text" id="domain" name="domain" placeholder="example.com" required>
+            <button type="submit">Log Unsubscribe</button>
+          </form>
+          <ul id="unsub-list"></ul>
         </main>
+        <script>
+          document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('unsub-form');
+            const domainInput = document.getElementById('domain');
+            const list = document.getElementById('unsub-list');
+
+            const fetchUnsubs = async () => {
+              const response = await fetch('/api/unsubscriptions');
+              const unsubs = await response.json();
+              list.innerHTML = '';
+              unsubs.forEach(unsub => {
+                const li = document.createElement('li');
+                const domainSpan = document.createElement('span');
+                domainSpan.textContent = unsub.domain;
+                const dateSpan = document.createElement('span');
+                dateSpan.textContent = new Date(unsub.created_at).toLocaleString();
+                li.appendChild(domainSpan);
+                li.appendChild(dateSpan);
+                list.appendChild(li);
+              });
+            };
+
+            form.addEventListener('submit', async (e) => {
+              e.preventDefault();
+              const domain = domainInput.value;
+              await fetch('/api/unsubscriptions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ domain })
+              });
+              domainInput.value = '';
+              fetchUnsubs();
+            });
+
+            fetchUnsubs();
+          });
+        </script>
       </body>
     </html>
-`;
+  `;
 }
