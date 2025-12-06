@@ -1,5 +1,9 @@
 import { renderHtml } from "./renderHtml";
 
+export interface Env {
+  DB: D1Database;
+}
+
 export default {
 	async fetch(request: Request, env: Env): Promise<Response> {
 		const { pathname } = new URL(request.url);
@@ -20,6 +24,21 @@ export default {
 					.bind(domain)
 					.run();
 				return new Response("Unsubscription added", { status: 201 });
+			}
+		} else if (pathname === "/api/unsubscriptions/search") {
+			if (request.method === "GET") {
+				const url = new URL(request.url);
+				const query = url.searchParams.get('q')?.toLowerCase() || '';
+				
+				if (!query) {
+					return Response.json([]);
+				}
+
+				const { results } = await env.DB.prepare(
+					"SELECT DISTINCT domain FROM unsubscriptions WHERE LOWER(domain) LIKE ? ORDER BY domain LIMIT 5"
+				).bind(`%${query}%`).all();
+				
+				return Response.json(results.map((r: any) => r.domain));
 			}
 		} else if (pathname === "/api/unsubscriptions/stats") {
 			const { results } = await env.DB.prepare(

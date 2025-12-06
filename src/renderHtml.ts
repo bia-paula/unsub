@@ -9,13 +9,41 @@ export function renderHtml() {
         <link rel="stylesheet" type="text/css" href="https://static.integrations.cloudflare.com/styles.css">
         <style>
           body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-          main { padding-top: 2rem; }
-          form { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
-          input { flex-grow: 1; }
+          main { padding-top: 2rem; max-width: 800px; margin: 0 auto; }
+          form { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 2rem; position: relative; }
+          .input-container { position: relative; width: 100%; }
+          input { width: 100%; padding: 0.5rem; font-size: 1rem; }
+          button[type="submit"] { padding: 0.5rem 1rem; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+          button[type="submit"]:hover { background: #0056b3; }
           ul { list-style-type: none; padding: 0; }
-          li { display: flex; justify-content: space-between; padding: 0.5rem; border-bottom: 1px solid #eee; }
-          table { width: 100%; border-collapse: collapse; margin-bottom: 2rem; }
-          th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #eee; }
+          li { display: flex; justify-content: space-between; padding: 0.75rem; border-bottom: 1px solid #eee; }
+          table { width: 100%; border-collapse: collapse; margin: 2rem 0; }
+          th, td { text-align: left; padding: 0.75rem; border-bottom: 1px solid #eee; }
+          .suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 1000;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+          }
+          .suggestion-item {
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+          }
+          .suggestion-item:hover {
+            background-color: #f8f9fa;
+          }
+          .suggestion-item.highlighted {
+            background-color: #e9ecef;
+          }
         </style>
       </head>
       <body>
@@ -24,7 +52,10 @@ export function renderHtml() {
         </header>
         <main>
           <form id="unsub-form">
-            <input type="text" id="domain" name="domain" placeholder="example.com" required>
+            <div class="input-container">
+              <input type="text" id="domain" name="domain" placeholder="example.com" autocomplete="off" required>
+              <div id="suggestions" class="suggestions"></div>
+            </div>
             <button type="submit">Log Unsubscribe</button>
           </form>
 
@@ -49,6 +80,10 @@ export function renderHtml() {
             const domainInput = document.getElementById('domain');
             const list = document.getElementById('unsub-list');
             const statsTableBody = document.querySelector('#stats-table tbody');
+            const suggestionsContainer = document.getElementById('suggestions');
+            let currentFocus = -1;
+            let suggestions = [];
+            let debounceTimer;
 
             const fetchStats = async () => {
               const response = await fetch('/api/unsubscriptions/stats');
@@ -85,17 +120,108 @@ export function renderHtml() {
               });
             };
 
+            const searchDomains = async (query) => {
+              if (query.length < 2) {
+                suggestionsContainer.style.display = 'none';
+                return;
+              }
+              
+              try {
+                const response = await fetch('/api/unsubscriptions/search?q=' + encodeURIComponent(query));
+                suggestions = await response.json();
+                
+                if (suggestions.length > 0) {
+                  suggestionsContainer.innerHTML = suggestions
+                    .map(function(suggestion, index) {
+                      return '<div class="suggestion-item' + 
+                            (index === currentFocus ? ' highlighted' : '') + 
+                            '" data-index="' + index + '">' + 
+                            suggestion + 
+                            '</div>';
+                    })
+                    .join('');
+                  suggestionsContainer.style.display = 'block';
+                } else {
+                  suggestionsContainer.style.display = 'none';
+                }
+              } catch (error) {
+                console.error('Error fetching suggestions:', error);
+                suggestionsContainer.style.display = 'none';
+              }
+            };
+            
+            const addActive = (items) => {
+              removeActive(items);
+              if (currentFocus >= items.length) currentFocus = 0;
+              if (currentFocus < 0) currentFocus = items.length - 1;
+              items[currentFocus].classList.add('highlighted');
+            };
+            
+            const removeActive = (items) => {
+              items.forEach(item => item.classList.remove('highlighted'));
+            };
+            
+            domainInput.addEventListener('input', (e) => {
+              const target = e.target;
+              clearTimeout(debounceTimer);
+              debounceTimer = setTimeout(() => {
+                searchDomains(target.value);
+              }, 200);
+            });
+            
+            domainInput.addEventListener('keydown', (e) => {
+              const items = suggestionsContainer.querySelectorAll('.suggestion-item');
+              
+              if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                currentFocus++;
+                addActive(items);
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                currentFocus--;
+                addActive(items);
+              } else if (e.key === 'Enter' && currentFocus > -1) {
+                e.preventDefault();
+                const item = items[currentFocus];
+                domainInput.value = item.textContent || '';
+                suggestionsContainer.style.display = 'none';
+              } else if (e.key === 'Escape') {
+                suggestionsContainer.style.display = 'none';
+              }
+            });
+            
+            suggestionsContainer.addEventListener('click', (e) => {
+              if (e.target.classList.contains('suggestion-item')) {
+                domainInput.value = e.target.textContent;
+                suggestionsContainer.style.display = 'none';
+                domainInput.focus();
+              }
+            });
+            
+            document.addEventListener('click', (e) => {
+              if (e.target !== domainInput) {
+                suggestionsContainer.style.display = 'none';
+              }
+            });
+
             form.addEventListener('submit', async (e) => {
               e.preventDefault();
-              const domain = domainInput.value;
-              await fetch('/api/unsubscriptions', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ domain })
-              });
-              domainInput.value = '';
-              fetchUnsubs();
-              fetchStats();
+              const domain = domainInput.value.trim();
+              if (!domain) return;
+              
+              try {
+                await fetch('/api/unsubscriptions', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ domain })
+                });
+                domainInput.value = '';
+                suggestionsContainer.style.display = 'none';
+                await Promise.all([fetchUnsubs(), fetchStats()]);
+              } catch (error) {
+                console.error('Error adding unsubscription:', error);
+                alert('Failed to add unsubscription. Please try again.');
+              }
             });
 
             fetchUnsubs();
